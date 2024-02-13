@@ -4,30 +4,22 @@ namespace App\Services;
 
 class ZapService {
 
-    private $baseUrl = "http://localhost:8080";
-    private $instance;
-    private $mobilePhone;
+    private static $baseUrl = "http://localhost:8080";
+    private static $instance;
+    private static $mobilePhone;
 
-    public function __construct($instance = null) {
-        if($instance) {
-            $this->instance = $instance;
-        }       
+    public static function setInstance($instance) {
+        self::$instance = $instance;
     }
 
-    public function setInstance() {
-        $this->instance = $instance;
-        return $this;
+    public static function setMobilePhone($mobilePhone) {
+        self::$mobilePhone = $mobilePhone;
     }
 
-    public function setMobilePhone($mobilePhone) {
-        $this->mobilePhone = $mobilePhone;
-        return $this;
-    }
-
-    public function sendImageMedia($imageUrl, $caption, $delay = 1200, $presence = 'composing') {
-        $apiUrl = "{$this->baseUrl}/message/sendImageMedia/{$this->instance}";
+    public static function sendImageMedia($imageUrl, $caption, $delay = 1200, $presence = 'composing') {
+        $apiUrl = self::$baseUrl . "/message/sendImageMedia/" . self::$instance;
         $data = [
-            'number' => $this->mobilePhone,
+            'number' => self::$mobilePhone,
             'options' => [
                 'delay' => $delay,
                 'presence' => $presence
@@ -49,10 +41,10 @@ class ZapService {
         return $response;
     }
 
-    public function sendText($text, $delay = 1200, $presence = 'composing') {
-        $apiUrl = "{$this->baseUrl}/message/sendText/{$this->instance}";
+    public static function sendText($text, $delay = 1200, $presence = 'composing') {
+        $apiUrl = self::$baseUrl . "/message/sendText/" . self::$instance;
         $data = [
-            'number' => $this->mobilePhone,
+            'number' => self::$mobilePhone,
             'options' => [
                 'delay' => $delay,
                 'presence' => $presence

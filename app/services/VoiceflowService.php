@@ -11,21 +11,57 @@ class VoiceflowService {
     private $headers = [];
     private $dmBaseUrl = 'https://general-runtime.voiceflow.com';
     private $session = 0;
+    private $state = ['variables' => []];
+    private $config = [
+        'tts' => false,
+        'stripSSML' => true,
+        'stopAll' => true,
+        'excludeTypes' => [
+            'block',
+            'debug',
+            'flow'
+        ]
+        ];
 
     public function __construct($userId = null) {
         if($userId) {
             $this->userId = $userId;
         }
 
+        $this->apiKey = getenv('VOICEFLOW_DM_API_KEY');
+        $this->dmBaseUrl = getenv('VOICEFLOW_DM_API_URL');
+        $this->projectId = getenv('VOICEFLOW_PROJECT_ID');
+        $this->versionId = getenv('VOICEFLOW_VERSION_ID');
+        
         $this->headers = [
-            'Content-Type: application/json',
-            'Authorization: ' . $this->apiKey
+            'Authorization' => $this->apiKey,
+            'Content-Type' => 'application/json',
+            'versionID' => $this->versionId
         ];
+
+        // var_dump($this->headers);
+        // exit;
+    }
+
+    public function setConfig($config) {
+        $this->config = array_merge($this->config, $config);
+    }
+
+    public function setState($state) {
+        $this->state = array_merge($this->state, $state);
+    }
+
+    private function generateSession() {
+        $this->session = $this->versionId . $this->rndId();
     }
 
     public function setUserId($userId) {
         $this->userId = $userId;
     }
+
+    public function setUserIdFromMobilePhone($mobilePhone) {
+        $this->userId = preg_replace('/\D/', '', $mobilePhone);
+    }    
 
     public function getUserId() {
         return $this->getUserId();
@@ -65,43 +101,56 @@ class VoiceflowService {
         }
     }
 
-    private function makeRequest($action = 'launch', $data) {
-    
-        $guzzle = new \GuzzleHttp\Client();
-        $request = $guzzle->request('POST', "{$this->dmBaseUrl}/state/user/{$this->userId}/{$action}", [
-            'headers' => $this->headers,
-            'json' => $data,
-            'versionID' => $this->versionId,
-            'sessionID' => $this->session
-        ]);
-        
-        return json_decode($request->getBody(), true);
+    private function makeRequest($method, $action, $data) {
+        try {
+            $guzzle = new \GuzzleHttp\Client();
+            $request = $guzzle->request($method, "{$this->dmBaseUrl}/state/user/{$this->userId}/{$action}", [
+                'headers' => $this->headers,
+                'json' => $data
+            ]);
+            $response = json_decode($request->getBody(), true);
+
+            return $response;
+        } catch(\Exception $e) {
+            throw new \Exception($e->getMessage());
+        }
     }
 
-    public function launch($data) {
-        return $this->makeRequest('launch', $data);
-    }
-
-    private function generateSession() {
-        $this->session = $this->versionId . $this->rndId();
+    private function launch($data) {
+        return $this->makeRequest('POST', 'launch', $data);
     }
 
     private function updateState($vars = []) {
-        $guzzle = new \GuzzleHttp\Client();
-        $request = $guzzle->request('PATH', "{$this->dmBaseUrl}/state/user/{$this->userId}/variables", [
-            'headers' => $this->headers,
-            'json' => $vars
-        ]);
-        return json_decode($request->getBody(), true);
+        return $this->makeRequest('PATH', 'variables', $vars);
     }
 
-    public function interact($data, $phoneNumber, $userName) {
+    private function fetchState() {
+        return $this->makeRequest('GET', '', []);
+    }
+
+    public function sendText($text) {
+        $data = [
+            'action' => [
+                'type' => 'text',
+                'payload' => $text,
+                'config' => $this->config,
+                'state' => $this->state
+            ]
+        ];
+        return $this->interact($data);
+    }
+
+    private function interact($data) {
 
         if(!$this->session) {
             $this->generateSession();
         }
 
-        $this->updateState(['user_id' => $this->userId, 'user_name' => $userName, 'mobile_phone' => $mobilePhone]);
+        $state = $this->fetchState();
+
+        // $this->updateState(['user_id' => $this->userId, 'user_name' => $userName, 'mobile_phone' => $mobilePhone]);
+
+        exit;
 
         $response = $this->makeRequest('interact', $data);
 
