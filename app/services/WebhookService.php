@@ -4,8 +4,11 @@ namespace App\Services;
 
 use App\Services\ZapService;
 use App\Services\VoiceflowService;
+use App\Helpers\WebhookDataProcessor;
 
 class WebhookService {
+
+    use WebhookDataProcessor;
 
     private $voiceflowService;
 
@@ -18,30 +21,30 @@ class WebhookService {
         error_log('Starting the upsertMessages process.');
 
         try {
-            $phoneNumber = $data->get('phone_number') ?? '1234';
-            $message = $data->get('message') ?? 'Olá!';
+            $data = $this->processorWebhookData($data);
+
+            $phoneNumber = $data['mobilePhone']
+            $message = $data['message'];
+
             error_log("Received data for upsertMessages. Phone number: {$phoneNumber}, Message: {$message}");
 
             // Enviar mensagem para o voiceflow
             $this->voiceflowService->setUserIdFromMobilePhone($phoneNumber);
             $voiceflowResponse = $this->voiceflowService->sendText($message);
-            error_log('Request sent to VoiceflowService.');
+            $voiceflowData = $this->processVoiceflowResponse($voiceflowResponse);
 
-            foreach($voiceflowResponse as $step) {
-                $type = $step['type'];
-                $payload = $step['payload'] ?? [];
-                $message = $payload['message'] ?? '';
-                $delay = $payload['delay'] ?? 1000;
 
-                error_log("Processing Voiceflow response step: Type: {$type}, Delay: {$delay}, Message: {$message}");
+            $type = $voiceflowData['type'];
+            $payload = $voiceflowData['payload'];
+            $message = $voiceflowData['message'];
+            $delay = $voiceflowData['delay'];
 
-                if($delay === 1000) {
-                    ZapService::init();
-                    error_log('ZapService initialized for message sending.');
-                    ZapService::sendText($phoneNumber, $message);
-                    error_log("Message sent to {$phoneNumber} via ZapService.");
-                }
-            }
+            error_log("Processing Voiceflow response step: Type: {$type}, Delay: {$delay}, Message: {$message}");
+
+            ZapService::init();
+            error_log('ZapService initialized for message sending.');
+            ZapService::sendText($phoneNumber, $message);
+            error_log("Message sent to {$phoneNumber} via ZapService.");
 
         } catch(\Exception $e) {
             error_log('Exception caught in upsertMessages: ' . $e->getMessage());
