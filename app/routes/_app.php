@@ -13,7 +13,7 @@ app()->get('/webhook', function() {
 });
 
 app()->get('/webhook/{event}', function($event) {
-    $webhookService = new WebhookService(new ZapService(), new VoiceflowService());
+    $webhookService = new WebhookService(new VoiceflowService());
     $request = request();
     return $webhookService->handle($request);
 });

@@ -35,7 +35,8 @@ class VoiceflowService {
         
         $this->headers = [
             'Authorization' => $this->apiKey,
-            'Content-Type' => 'application/json',
+            'accept' => 'application/json',
+            'content-type' => 'application/json',
             'versionID' => $this->versionId
         ];
 
@@ -101,31 +102,54 @@ class VoiceflowService {
         }
     }
 
-    private function makeRequest($method, $action, $data) {
+    private function makeRequest($method, $action) {
         try {
+
+            $data['action'] = $action;
+            $data['config'] = $this->config;
+            $data['state'] = $this->state;
+
+            if($action == 'launch') {
+                $data = [];
+                $action = 'interact';
+            }
+            
+            $url = "{$this->dmBaseUrl}/state/user/{$this->userId}/{$action}";
+
+            // var_dump($method, $url);
+            // exit;
+
             $guzzle = new \GuzzleHttp\Client();
-            $request = $guzzle->request($method, "{$this->dmBaseUrl}/state/user/{$this->userId}/{$action}", [
+            $request = $guzzle->request($method, $url, [
                 'headers' => $this->headers,
-                'json' => $data
+                'json' => []
             ]);
+
             $response = json_decode($request->getBody(), true);
 
             return $response;
+
         } catch(\Exception $e) {
+            echo '<pre>';
+            var_dump($e);
+            exit;
             throw new \Exception($e->getMessage());
         }
     }
 
-    private function launch($data) {
-        return $this->makeRequest('POST', 'launch', $data);
+    public function launch() {
+        return $this->makeRequest('POST', 'launch', []);
     }
 
     private function updateState($vars = []) {
-        return $this->makeRequest('PATH', 'variables', $vars);
+        $state = $this->makeRequest('PATH', 'variables', $vars);
+        return $state;
     }
 
     private function fetchState() {
-        return $this->makeRequest('GET', '', []);
+        $state = $this->makeRequest('GET', '', []);
+        $this->setState($state);
+        return $this->state;
     }
 
     public function sendText($text) {
@@ -137,31 +161,21 @@ class VoiceflowService {
                 'state' => $this->state
             ]
         ];
-        return $this->interact($data);
+        $interact = $this->interact($data);
+
+        return $interact;
     }
 
     private function interact($data) {
-
-        if(!$this->session) {
-            $this->generateSession();
-        }
+        
+        $this->generateSession();
 
         $state = $this->fetchState();
-
-        // $this->updateState(['user_id' => $this->userId, 'user_name' => $userName, 'mobile_phone' => $mobilePhone]);
-
-        exit;
-
-        $response = $this->makeRequest('interact', $data);
-
-        $data = [];
-
-        foreach($response['data'] as $trace) {
-            $data[] = $this->handleResponse($trace);
+        if(count($state['variables']) == 0) {
+            $this->launch();
         }
 
-        return $data;
-
+        return $this->makeRequest('POST', 'interact');
     }
 
 }
