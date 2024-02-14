@@ -6,10 +6,20 @@ class ZapService {
 
     private static $baseUrl;
     private static $instance;
+    private static $token;
 
     public static function init() {
-        self::$baseUrl = getenv('EVOLUTION_API_URL');
-        self::$instance = getenv('EVOLUTION_API_INSTANCE_NAME');
+        self::$baseUrl = 'https://apps-evolutionapi.s12n1h.easypanel.host';
+        self::$instance = 'Oracao';
+        self::$token = 'fYXmfeZRpc3DCqTs8HytjrzUlRX3UpiO';
+    }
+
+    private static function getHeaders() {
+        return [
+            'headers' => [
+                'apikey' => self::$token
+            ]
+        ];
     }
 
     public static function sendImageMedia($mobilePhone, $imageUrl, $caption, $delay = 1200, $presence = 'composing') {
@@ -28,9 +38,9 @@ class ZapService {
         ];
 
         $guzzle = new \GuzzleHttp\Client();
-        $request = $guzzle->request('POST', $apiUrl, [
+        $request = $guzzle->request('POST', $apiUrl, array_merge(self::getHeaders(), [
             'json' => $data
-        ]);
+        ]));
 
         $response = json_decode($request->getBody(), true);
 
@@ -51,9 +61,9 @@ class ZapService {
         ];
 
         $guzzle = new \GuzzleHttp\Client();
-        $request = $guzzle->request('POST', $apiUrl, [
+        $request = $guzzle->request('POST', $apiUrl, array_merge(self::getHeaders(), [
             'json' => $data
-        ]);
+        ]));
 
         $response = json_decode($request->getBody(), true);
 

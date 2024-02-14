@@ -21,9 +21,9 @@ class WebhookService {
         error_log('Starting the upsertMessages process.');
 
         try {
-            $data = $this->processorWebhookData($data);
+            $data = $this->processEvolutionApiRequest($data);
 
-            $phoneNumber = $data['mobilePhone']
+            $phoneNumber = $data['mobilePhone'];
             $message = $data['message'];
 
             error_log("Received data for upsertMessages. Phone number: {$phoneNumber}, Message: {$message}");

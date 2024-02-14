@@ -4,7 +4,7 @@ namespace App\Helpers;
 
 trait WebhookDataProcessor {
 
-    public function processVoiceflowResponse($voiceflowResponse, $phoneNumber) {
+    public function processVoiceflowResponse($voiceflowResponse) {
         foreach ($voiceflowResponse as $step) {
             $type = $step['type'];
             $payload = $step['payload'] ?? [];
@@ -22,26 +22,28 @@ trait WebhookDataProcessor {
         }
     }
 
-    public function processEvolutionApiRequest($data) {
+    public function processEvolutionApiRequest($request) {
         // Inicializa a resposta
         $response = [];
+
+        $data = $request->get('data');
         
-        if ($data['data']['messageType'] === 'conversation') {
+        if ($data['messageType'] === 'conversation') {
             // Trata mensagens de texto
-            $mobilePhone = explode('@', $data['data']['key']['remoteJid'])[0];
+            $mobilePhone = explode('@', $data['key']['remoteJid'])[0];
             $senderName = $data['pushName'];
-            $message = $data['data']['message']['conversation'];
+            $message = $data['message']['conversation'];
     
             $response = [
                 'mobilePhone' => $mobilePhone,
                 'senderName' => $senderName,
                 'message' => $message,
             ];
-        } elseif ($data['data']['messageType'] === 'audioMessage') {
+        } elseif ($data['messageType'] === 'audioMessage') {
             // Trata mensagens de áudio
-            $mobilePhone = explode('@', $data['data']['key']['remoteJid'])[0];
+            $mobilePhone = explode('@', $data['key']['remoteJid'])[0];
             $senderName = $data['pushName'];
-            $audioUrl = $data['data']['message']['audioMessage']['url'];
+            $audioUrl = $data['message']['audioMessage']['url'];
     
             $response = [
                 'mobilePhone' => $mobilePhone,
@@ -49,12 +51,12 @@ trait WebhookDataProcessor {
                 'message' => 'Audio message received.',
                 'audioUrl' => $audioUrl,
             ];
-        } elseif ($data['data']['messageType'] === 'imageMessage') {
+        } elseif ($data['messageType'] === 'imageMessage') {
             // Trata mensagens de imagem
-            $mobilePhone = explode('@', $data['data']['key']['remoteJid'])[0];
+            $mobilePhone = explode('@', $data['key']['remoteJid'])[0];
             $senderName = $data['pushName'];
-            $imageUrl = $data['data']['message']['imageMessage']['url'];
-            $imageThumbnail = base64_encode($data['data']['message']['imageMessage']['jpegThumbnail']); // Codifica a miniatura em base64
+            $imageUrl = $data['message']['imageMessage']['url'];
+            $imageThumbnail = base64_encode($data['message']['imageMessage']['jpegThumbnail']); // Codifica a miniatura em base64
     
             $response = [
                 'mobilePhone' => $mobilePhone,
