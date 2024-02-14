@@ -104,15 +104,11 @@ class VoiceflowService {
     private function makeRequest($method, $action, $data = []) {
         try {
 
-            
-            $endpoint = !empty($action) ? 'interact' : '';
+            $endpoint = !empty($action) ? ($action == 'launch' ? 'interact' : '') : '';
             
             $data['config'] = $data['config'] ?? $this->config;
-            $data['state'] = $data['state'] ?? $this->state;    
-
-            if($action != 'launch') {
-                $data['action']['type'] = $data['launch'] ?? 'launch';
-            }
+            $data['state'] = $data['state'] ?? $this->state;
+            $data['action']['type'] = $data['action']['type'] ?? 'launch';
 
             $url = "{$this->dmBaseurl}/state/user/{$this->userId}/{$endpoint}";
 
@@ -153,6 +149,10 @@ class VoiceflowService {
     }
 
     public function sendText($text) {
+        if($text == '/reset') {
+            return $this->resetState();
+        }
+ 
         $data = [
             'action' => [
                 'type' => 'text',
@@ -164,16 +164,32 @@ class VoiceflowService {
         return $interact;
     }
 
+    private function resetState() {
+        $this->makeRequest('DELETE', '', []);
+        return [
+            [
+                'type' => 'text',
+                'payload' => [
+                    'type' => 'message',
+                    'message' => 'Resetting the conversation.'
+                ]
+            ]
+        ];
+    }
+
     private function interact($data) {
         
         $this->generateSession();
 
         $state = $this->fetchState();
+ 
         if(count($state['variables']) == 0) {
             $this->launch();
+
+            return $this->makeRequest('POST', 'launch', $data);
         }
 
-        $response = $this->makeRequest('POST', 'interact');
+        $response = $this->makeRequest('POST', 'interact', $data);
         
         return $response;
     }

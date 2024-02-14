@@ -34,6 +34,8 @@ class WebhookService {
 
             $voiceflowData = $this->processVoiceflowResponse($voiceflowResponse);
 
+            var_dump('voiceflow response', $voiceflowData);
+
             $type = $voiceflowData['type'];
             $payload = $voiceflowData['payload'];
             $message = $voiceflowData['message'];
