@@ -9,7 +9,7 @@ class VoiceflowService {
     private $projectId = null;
     private $userId;
     private $headers = [];
-    private $dmBaseUrl = 'https://general-runtime.voiceflow.com';
+    private $dmBaseurl = 'https://general-runtime.voiceflow.com';
     private $session = 0;
     private $state = ['variables' => []];
     private $config = [
@@ -29,7 +29,6 @@ class VoiceflowService {
         }
 
         $this->apiKey = getenv('VOICEFLOW_DM_API_KEY');
-        $this->dmBaseUrl = getenv('VOICEFLOW_DM_API_URL');
         $this->projectId = getenv('VOICEFLOW_PROJECT_ID');
         $this->versionId = getenv('VOICEFLOW_VERSION_ID');
         
@@ -102,27 +101,28 @@ class VoiceflowService {
         }
     }
 
-    private function makeRequest($method, $action) {
+    private function makeRequest($method, $action, $data = []) {
         try {
 
-            $data['action'] = $action;
-            $data['config'] = $this->config;
-            $data['state'] = $this->state;
-
-            if($action == 'launch') {
-                $data = [];
-                $action = 'interact';
-            }
             
-            $url = "{$this->dmBaseUrl}/state/user/{$this->userId}/{$action}";
+            $endpoint = !empty($action) ? 'interact' : '';
+            
+            $data['config'] = $data['config'] ?? $this->config;
+            $data['state'] = $data['state'] ?? $this->state;    
 
-            // var_dump($method, $url);
+            if($action != 'launch') {
+                $data['action']['type'] = $data['launch'] ?? 'launch';
+            }
+
+            $url = "{$this->dmBaseurl}/state/user/{$this->userId}/{$endpoint}";
+
+            //var_dump($method, $url);
             // exit;
 
             $guzzle = new \GuzzleHttp\Client();
             $request = $guzzle->request($method, $url, [
                 'headers' => $this->headers,
-                'json' => []
+                'json' => $data
             ]);
 
             $response = json_decode($request->getBody(), true);
@@ -157,8 +157,6 @@ class VoiceflowService {
             'action' => [
                 'type' => 'text',
                 'payload' => $text,
-                'config' => $this->config,
-                'state' => $this->state
             ]
         ];
         $interact = $this->interact($data);
@@ -175,7 +173,9 @@ class VoiceflowService {
             $this->launch();
         }
 
-        return $this->makeRequest('POST', 'interact');
+        $response = $this->makeRequest('POST', 'interact');
+        
+        return $response;
     }
 
 }

@@ -5,6 +5,7 @@ namespace App\Helpers;
 trait WebhookDataProcessor {
 
     public function processVoiceflowResponse($voiceflowResponse) {
+    
         foreach ($voiceflowResponse as $step) {
             $type = $step['type'];
             $payload = $step['payload'] ?? [];

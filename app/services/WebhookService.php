@@ -31,8 +31,8 @@ class WebhookService {
             // Enviar mensagem para o voiceflow
             $this->voiceflowService->setUserIdFromMobilePhone($phoneNumber);
             $voiceflowResponse = $this->voiceflowService->sendText($message);
-            $voiceflowData = $this->processVoiceflowResponse($voiceflowResponse);
 
+            $voiceflowData = $this->processVoiceflowResponse($voiceflowResponse);
 
             $type = $voiceflowData['type'];
             $payload = $voiceflowData['payload'];
