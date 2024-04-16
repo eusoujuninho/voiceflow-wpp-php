@@ -5,7 +5,9 @@ namespace App\Helpers;
 trait WebhookDataProcessor {
 
     public function processVoiceflowResponse($voiceflowResponse) {
-    
+        
+        $response = [];
+
         foreach ($voiceflowResponse as $step) {
             $type = $step['type'];
             $payload = $step['payload'] ?? [];
@@ -14,13 +16,15 @@ trait WebhookDataProcessor {
 
             error_log("Processing Voiceflow response step: Type: {$type}, Delay: {$delay}, Message: {$message}");
 
-            return [
+            $response[] = [
                 'type' => $type,
                 'payload' => $payload,
                 'message' => $message,
                 'delay' => $delay
             ];
         }
+
+        return $response;
     }
 
     public function processEvolutionApiRequest($request) {

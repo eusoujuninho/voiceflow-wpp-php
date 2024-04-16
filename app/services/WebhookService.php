@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Services\ZapService;
+use App\Models\Message; // Certifique-se de que o modelo Message esteja incluído corretamente.
 use App\Services\VoiceflowService;
 use App\Helpers\WebhookDataProcessor;
 
@@ -25,40 +25,50 @@ class WebhookService {
 
             $phoneNumber = $data['mobilePhone'];
             $message = $data['message'];
+            $noReply = false;
 
             error_log("Received data for upsertMessages. Phone number: {$phoneNumber}, Message: {$message}");
 
-            // Enviar mensagem para o voiceflow
+            // Enviar mensagem para o Voiceflow
             $this->voiceflowService->setUserIdFromMobilePhone($phoneNumber);
-            $voiceflowResponse = $this->voiceflowService->sendText($message);
 
-            $voiceflowData = $this->processVoiceflowResponse($voiceflowResponse);
+            $voiceflowResponse = $noReply ? $this->voiceflowService->noReply() : $this->voiceflowService->interactWithText($message);
+            $vfResponse = $this->processVoiceflowResponse($voiceflowResponse); // Updated to use interactWithText
 
-            var_dump('voiceflow response', $voiceflowData);
+            error_log("Voiceflow response: " . print_r($voiceflowResponse, true));
 
-            $type = $voiceflowData['type'];
-            $payload = $voiceflowData['payload'];
-            $message = $voiceflowData['message'];
-            $delay = $voiceflowData['delay'];
+            echo '<pre>';
 
-            error_log("Processing Voiceflow response step: Type: {$type}, Delay: {$delay}, Message: {$message}");
+            var_dump($vfResponse);
+            exit;
 
-            ZapService::init();
-            error_log('ZapService initialized for message sending.');
-            ZapService::sendText($phoneNumber, $message);
-            error_log("Message sent to {$phoneNumber} via ZapService.");
+            if (isset($voiceflowResponse['type']) && $voiceflowResponse['type'] === 'text') {
+                $processedMessage = $voiceflowResponse['payload']['message'];
+                error_log("Processing Voiceflow response: Message: {$processedMessage}");
+
+                // Cria o objeto Message e prepara o payload
+                $messageObject = new Message($phoneNumber);
+                $messageObject->setText($processedMessage);
+                $messagePayload = $messageObject->preparePayload();
+
+                error_log("Prepared message payload: " . print_r($messagePayload, true));
+
+                // Retorna o payload como resposta JSON
+                return json_encode([
+                    'success' => true,
+                    'message' => 'Mensagem preparada com sucesso!',
+                    'payload' => $messagePayload
+                ]);
+
+            } else {
+                error_log('No valid response type from Voiceflow to process.');
+                return json_encode(['message' => 'Tipo de resposta inválido do Voiceflow']);
+            }
 
         } catch(\Exception $e) {
             error_log('Exception caught in upsertMessages: ' . $e->getMessage());
-            return response()->json(['message' => $e->getMessage()], 500);
+            return json_encode(['message' => $e->getMessage()], 500);
         }
-
-        error_log('upsertMessages process completed successfully.');
-        return json_encode([
-            'success' => true,
-            'message' => 'Mensagens atualizadas com sucesso!',
-            'event' => 'messages-upsert'
-        ]);
     }
 
     public function handle($request) {
@@ -69,11 +79,10 @@ class WebhookService {
         error_log("Webhook received for event: {$event}");
 
         if ($event === 'messages-upsert') {
-            return $this->upsertMessages($request);
+            return $this->upsertMessages($request); // Asumindo que $request->all() irá fornecer os dados necessários.
         } else {
             error_log('No defined action for this event.');
             return json_encode(['message' => 'Nenhuma ação definida para este evento']);
         }
     }
-
 }

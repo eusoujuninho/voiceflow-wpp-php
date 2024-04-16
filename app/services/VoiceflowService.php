@@ -3,56 +3,41 @@
 namespace App\Services;
 
 class VoiceflowService {
-
     private $apiKey;
-    private $versionId = 'development';
-    private $projectId = null;
+    private $versionId;
+    private $projectId;
     private $userId;
-    private $headers = [];
+    private $headers;
     private $dmBaseurl = 'https://general-runtime.voiceflow.com';
     private $session = 0;
-    private $state = ['variables' => []];
+    private $state = ['variables' => ['user_flow_step' => 'abandoned_cart']];
     private $config = [
         'tts' => false,
         'stripSSML' => true,
         'stopAll' => true,
-        'excludeTypes' => [
-            'block',
-            'debug',
-            'flow'
-        ]
-        ];
+        'excludeTypes' => []
+    ];
 
     public function __construct($userId = null) {
-        if($userId) {
-            $this->userId = $userId;
-        }
-
+        $this->userId = $userId;
         $this->apiKey = getenv('VOICEFLOW_DM_API_KEY');
         $this->projectId = getenv('VOICEFLOW_PROJECT_ID');
-        $this->versionId = getenv('VOICEFLOW_VERSION_ID');
+        $this->versionId = getenv('VOICEFLOW_VERSION_ID') ?: 'development';
         
         $this->headers = [
             'Authorization' => $this->apiKey,
-            'accept' => 'application/json',
-            'content-type' => 'application/json',
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json',
             'versionID' => $this->versionId
         ];
-
-        // var_dump($this->headers);
-        // exit;
     }
 
-    public function setConfig($config) {
+    public function setConfig(array $config) {
         $this->config = array_merge($this->config, $config);
     }
 
-    public function setState($state) {
+    public function setState(array $state) {
         $this->state = array_merge($this->state, $state);
-    }
-
-    private function generateSession() {
-        $this->session = $this->versionId . $this->rndId();
     }
 
     public function setUserId($userId) {
@@ -61,137 +46,83 @@ class VoiceflowService {
 
     public function setUserIdFromMobilePhone($mobilePhone) {
         $this->userId = preg_replace('/\D/', '', $mobilePhone);
-    }    
+    }
 
     public function getUserId() {
-        return $this->getUserId();
+        return $this->userId;
     }
 
-    private function rndID() {
-        // Random Number Generator
-        $randomNo = rand(1, 1000);
-        // get Timestamp
-        $timestamp = time();
-        // get Day
-        $weekday = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        $day = $weekday[date('w')];
-        return $randomNo . $day . $timestamp;
-    }
-      
-
-    private function handleResponse($trace) {
-        $type = $trace['type'];
-        switch($type) {
-            case 'text':
-            case 'speak':
-                return [
-                    'message' => $trace['payload']['message'],
-                    'type' => 'text'
-                ];
-            break;
-
-            case 'image':
-                return [
-                    'image_url' => $trace['payload']['url'],
-                    'type' => 'image'
-                ];
-
-            case 'end':
-                return false;
-        }
+    private function generateSession() {
+        $this->session = $this->versionId . $this->generateRandomId();
     }
 
-    private function makeRequest($method, $action, $data = []) {
+    private function generateRandomId() {
+        return rand(1, 1000) . ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][date('w')] . time();
+    }
+
+    private function makeHttpRequest($method, $endpoint, array $data = []) {
         try {
-
-            $endpoint = !empty($action) ? ($action == 'launch' ? 'interact' : '') : '';
-            
-            $data['config'] = $data['config'] ?? $this->config;
-            $data['state'] = $data['state'] ?? $this->state;
-            $data['action']['type'] = $data['action']['type'] ?? 'launch';
-
             $url = "{$this->dmBaseurl}/state/user/{$this->userId}/{$endpoint}";
+            $client = new \GuzzleHttp\Client();
 
-            //var_dump($method, $url);
-            // exit;
-
-            $guzzle = new \GuzzleHttp\Client();
-            $request = $guzzle->request($method, $url, [
+            $response = $client->request($method, $url, [
                 'headers' => $this->headers,
-                'json' => $data
+                'json' => array_merge(['config' => $this->config, 'state' => $this->state], $data)
             ]);
 
-            $response = json_decode($request->getBody(), true);
-
-            return $response;
-
-        } catch(\Exception $e) {
-            echo '<pre>';
-            var_dump($e);
-            exit;
-            throw new \Exception($e->getMessage());
+            return json_decode($response->getBody(), true);
+        } catch (\Exception $e) {
+            throw new \Exception("HTTP request failed: " . $e->getMessage());
         }
     }
 
-    public function launch() {
-        return $this->makeRequest('POST', 'launch', []);
-    }
-
-    private function updateState($vars = []) {
-        $state = $this->makeRequest('PATH', 'variables', $vars);
-        return $state;
-    }
-
-    private function fetchState() {
-        $state = $this->makeRequest('GET', '', []);
-        $this->setState($state);
-        return $this->state;
-    }
-
-    public function sendText($text) {
-        if($text == '/reset') {
-            return $this->resetState();
+    public function interactWithText($text) {
+        if ($text === '/reset') {
+            return $this->resetConversation();
+        } elseif (strpos($text, '/setvars:') === 0) {
+            return $this->setVariablesFromString(substr($text, 9));
         }
- 
-        $data = [
+
+        return $this->makeHttpRequest('POST', 'interact', [
+            'action' => ['type' => 'text', 'payload' => $text]
+        ]);
+    }
+
+    private function setVariablesFromString($varsString) {
+        $varsArray = [];
+        $variables = explode(';', $varsString);
+        foreach ($variables as $var) {
+            list($key, $value) = explode('=', $var);
+            $varsArray[$key] = $value;
+        }
+        $this->updateVariables($varsArray);
+        return $this->state['variables']; // Return updated variables as response
+    }
+
+    public function noReply() {
+        // Envie a ação de 'no-reply' para o Voiceflow
+        $response = $this->makeHttpRequest('POST', 'interact', [
             'action' => [
-                'type' => 'text',
-                'payload' => $text,
-            ]
-        ];
-        $interact = $this->interact($data);
+                'type' => 'no-reply'
+            ],
+            // Adicione estado, configuração e outros metadados conforme necessário
+        ]);
 
-        return $interact;
-    }
-
-    private function resetState() {
-        $this->makeRequest('DELETE', '', []);
-        return [
-            [
-                'type' => 'text',
-                'payload' => [
-                    'type' => 'message',
-                    'message' => 'Resetting the conversation.'
-                ]
-            ]
-        ];
-    }
-
-    private function interact($data) {
-        
-        $this->generateSession();
-
-        $state = $this->fetchState();
- 
-        if(count($state['variables']) == 0) {
-            $this->launch();
-
-            return $this->makeRequest('POST', 'launch', $data);
-        }
-
-        $response = $this->makeRequest('POST', 'interact', $data);
-        
         return $response;
     }
 
+    public function resetConversation() {
+        $this->makeHttpRequest('DELETE', '');
+        return [['type' => 'text', 'payload' => ['type' => 'message', 'message' => 'Resetting the conversation.']]];
+    }
+
+    public function updateVariables($variables) {
+        return $this->makeHttpRequest('PATCH', '', ['variables' => $variables]);
+    }
+
+    public function retrieveState() {
+        $state = $this->makeHttpRequest('GET', '');
+        $this->setState($state);
+        return $this->state;
+    }
 }

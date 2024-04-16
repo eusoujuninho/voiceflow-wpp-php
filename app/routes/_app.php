@@ -8,11 +8,11 @@ app()->get('/', function () {
     response()->json(['message' => 'Congrats!! You\'re on Leaf API']);
 });
 
-app()->post('/webhook', function() {
+app()->all('/webhook', function() {
     response()->json(['message' => 'Webhook is working!']);
 });
 
-app()->post('/webhook/{event}', function($event) {
+app()->all('/webhook/{event}', function($event) {
     $webhookService = new WebhookService(new VoiceflowService());
     $request = request();
     return $webhookService->handle($request);
