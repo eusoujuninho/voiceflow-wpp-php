@@ -4,7 +4,7 @@ namespace App\Helpers;
 
 trait WebhookDataProcessor {
 
-    public function processVoiceflowResponse($voiceflowResponse) {
+    public function filterVoiceflowResponse($voiceflowResponse) {
         
         $response = [];
 
